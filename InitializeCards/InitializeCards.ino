@@ -30,76 +30,48 @@ void setup() {
   mfrc522_1.PCD_Init();
   mfrc522_2.PCD_Init();
 
+  for(int i = 0; i < EEPROM.length(); i++)
+  {
+    EEPROM.update(i, 0);  
+  }
+    
   Serial.println("Setup");
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  Serial.println("Programming cards");
+  Serial.println("Programming cards"); 
   Serial.println(String(card1Read));
   Serial.println(String(card2Read));
-  
-  if(mfrc522_2.PICC_IsNewCardPresent() && mfrc522_2.PICC_ReadCardSerial() && !card2Read)
-  {     
-    Serial.println("Read card 2. Programming.");
-    if(card1Read)
-    {
-        startInt = MAXTAGLEN;
-    }
-    else
-    {
-        startInt = 0;  
-    }
-      
-    for (byte i = startInt; i < mfrc522_2.uid.size + startInt; i++) 
-    {
-      read_rfid2[i] = mfrc522_2.uid.uidByte[i];
-    }
-    card2Read = true;
-  }
 
   if(mfrc522_1.PICC_IsNewCardPresent() && mfrc522_1.PICC_ReadCardSerial() && !card1Read)
   {  
     Serial.println("Read card 1. Programming.");
-    if(card2Read)
-    {
-        startInt = MAXTAGLEN;
-    }
-    else
-    {
-        startInt = 0;  
-    }
 
-    for (byte i = startInt; i < mfrc522_1.uid.size + startInt; i++) 
+    for (byte i = 0; i < mfrc522_1.uid.size; i++) 
     {
-      read_rfid1[i] = mfrc522_1.uid.uidByte[i];
+      EEPROM.update(i, mfrc522_1.uid.uidByte[i]);
     }
     card1Read = true;
   }
 
+  if(mfrc522_2.PICC_IsNewCardPresent() && mfrc522_2.PICC_ReadCardSerial() && !card2Read)
+  {     
+    Serial.println("Read card 2. Programming.");
+      
+    for (byte i = MAXTAGLEN; i < mfrc522_2.uid.size + MAXTAGLEN; i++) 
+    {
+      EEPROM.update(i, mfrc522_2.uid.uidByte[i - MAXTAGLEN]);
+    }
+    card2Read = true;
+  }
+
   if(card1Read && card2Read)
   {
-    Serial.println("Writing correct card 1.");
-      
-    for (byte x = 0; x < MAXTAGLEN; x++) RightCards[1][x] = read_rfid1[x];
-  
-    Serial.println("Writing correct card 2.");
-      
-    for (byte x = 0; x < MAXTAGLEN; x++) RightCards[2][x] = read_rfid2[x];
-    
-    for (byte x = 0; x < 2; x++)
+    for(int i = 0; i < 8; i++)
     {
-      for (byte pos = 0; pos < MAXTAGLEN; pos++)  //loop through each position in the right card string
-      {
-        Serial.println("Updating EEPROM.");
-        
-        EEPROM.update((x * MAXTAGLEN) + pos + MEMBASE, RightCards[x][pos]);   
-      }
+        Serial.println(EEPROM.read(i));
     }
-    for(int i = 0; i < EEPROM.length(); i++)
-    {
-      Serial.println(EEPROM.read(i));  
-    }
+    while(true);
   }
-  
 }

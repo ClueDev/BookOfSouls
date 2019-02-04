@@ -9,6 +9,9 @@
 #define RST_PIN2  6
 #define ARDUINO_RX 5  //should connect to TX of the Serial MP3 Player module
 #define ARDUINO_TX 3  //connect to RX of the module
+#define NUMBER_OF_CARDS 2 //Number of RFID readers
+#define READER_ONE 0
+#define READER_TWO 1
 MFRC522 mfrc522_1(SS_PIN, RST_PIN);   // Create MFRC522 instance.
 MFRC522 mfrc522_2(SS_PIN2, RST_PIN2);   // Create MFRC522 instance.
 SoftwareSerial mp3(ARDUINO_RX, ARDUINO_TX); //Create an mp3 instance.
@@ -23,11 +26,8 @@ int winningLED1 =     17;
 int switch1Pin =      4;
 int switch2Pin =      2;
 int switch1LED =      15;
-//int bluePin1 =       16;
-//int greenPin2 =      18;
 int switch2LED =       19;
-String keyOne = "4D FD 50 D3";
-String keyTwo = "99 5E C5 48";
+String keys[NUMBER_OF_CARDS];
 
 bool puzzleFinished = false;
 
@@ -43,7 +43,7 @@ String sanswer(void);
 String sbyte2hex(uint8_t b);
 
 bool isProgramMode = false;
-int programModePin = 18; //set Program mode here
+int programModePin = 16; //set Program mode here
 
 const byte MAXTAGLEN = 4;
 const int MEMBASE = 0;
@@ -89,7 +89,6 @@ byte read_rfid2[MAXTAGLEN];
 /************ Opitons **************************/
 #define DEV_TF            0X02
 
-
 /*********************************************************************/
   
 void setup() {
@@ -102,6 +101,7 @@ void setup() {
   pinMode(switch2Pin, INPUT_PULLUP);
   pinMode(switch1LED, OUTPUT);
   pinMode(switch2LED, OUTPUT);
+  pinMode(programModePin, INPUT_PULLUP);
   digitalWrite(relayPin, HIGH);
   digitalWrite(winningLED1, LOW);
   digitalWrite(switch1LED, LOW);
@@ -113,6 +113,9 @@ void setup() {
   mfrc522_1.PCD_Init();
   mfrc522_2.PCD_Init();
 
+  //initializes cards upon starting
+  setCorrectCards();
+
   mp3.begin(9600);
   delay(500);
 
@@ -120,8 +123,6 @@ void setup() {
   delay(500);
   sendCommand(CMD_VOLUME_UP);
   sendCommand(CMD_VOLUME_UP);
-
-  setCorrectCards();
   
   Serial.println("Approximate your card to the reader...");
   Serial.println();
@@ -129,16 +130,18 @@ void setup() {
 
 void loop() {
 
-//  if(digitalRead(programModePin, HIGH))
-//  {
-//     programCards();
-//  }
+  if(digitalRead(programModePin) == LOW)
+  {
+     programCards();
+  }
 
   while(mfrc522_1.PICC_IsNewCardPresent() && mfrc522_1.PICC_ReadCardSerial() || reader1Complete)
   { 
       Serial.println("While loop 1");
+      Serial.println(getUID(mfrc522_1));
+      Serial.println(keys[READER_ONE]);
       // If it wasn't the correct RFID, break
-      if(!(UID(mfrc522_1) == keyOne))
+      if(!(getUID(mfrc522_1) == keys[READER_ONE]))
           break;
 
       Serial.println("Reader 1 correct");
@@ -156,7 +159,9 @@ void loop() {
       if(mfrc522_2.PICC_IsNewCardPresent() && mfrc522_2.PICC_ReadCardSerial() || reader2Complete)
       {
             // If it wasn't the correct RFID, break
-            if(!(UID(mfrc522_2) == keyTwo))
+            Serial.println(getUID(mfrc522_2));
+            Serial.println(keys[READER_TWO]);
+            if(!(getUID(mfrc522_2) == keys[READER_TWO]))
                 break;
 
             Serial.println("Reader 2 correct");
@@ -181,8 +186,10 @@ void loop() {
   while(mfrc522_2.PICC_IsNewCardPresent() && mfrc522_2.PICC_ReadCardSerial() || reader2Complete)
   { 
       Serial.println("While loop 2");
+      Serial.println(getUID(mfrc522_2));
+      Serial.println(keys[READER_TWO]);
       // If it wasn't the correct RFID, break
-      if(!(UID(mfrc522_2) == keyTwo))
+      if(!(getUID(mfrc522_2) == keys[READER_TWO]))
           break;
 
       Serial.println("Reader 2 correct");
@@ -198,8 +205,10 @@ void loop() {
       // Try to read reader 1
       if(mfrc522_1.PICC_IsNewCardPresent() && mfrc522_1.PICC_ReadCardSerial() || reader1Complete)
       {
+            Serial.println(getUID(mfrc522_1));
+            Serial.println(keys[READER_ONE]);
             // If it wasn't the correct RFID, break
-            if(!(UID(mfrc522_1) == keyOne))
+            if(!(getUID(mfrc522_1) == keys[READER_ONE]))
                 break;
             Serial.println("Reader 1 correct");
             // If switch is clicked, turn on the light and make a 'click' noise (reader 1 is complete)
@@ -228,67 +237,79 @@ void loop() {
 
 void programCards()
 {
+  // put your main code here, to run repeatedly:
   Serial.println("Programming cards");
-
-  if(mfrc522_2.PICC_IsNewCardPresent() && mfrc522_2.PICC_ReadCardSerial())
-  {     
-
-    Serial.println("Read card 2. Programming.");
-    
-    for (byte x = 0; x < MAXTAGLEN; x++) read_rfid2[x] = 0;
-
-    for (byte i = 0; i < mfrc522_2.uid.size; i++) 
-    {
-      read_rfid2[i] = mfrc522_2.uid.uidByte[i];
-    }
-  }
-
-  if(mfrc522_1.PICC_IsNewCardPresent() && mfrc522_1.PICC_ReadCardSerial())
-  {  
-    Serial.println("Read card 1. Programming.");
-       
-    for (byte x = 0; x < MAXTAGLEN; x++) read_rfid1[x] = 0;
-
-    for (byte i = 0; i < mfrc522_1.uid.size; i++) 
-    {
-      read_rfid1[i] = mfrc522_1.uid.uidByte[i];
-    }
-  }
-
-  Serial.println("Writing correct card 1.");
-    
-  for (byte x = 0; x < MAXTAGLEN; x++) RightCards[1][x] = read_rfid1[x];
-
-  Serial.println("Writing correct card 2.");
-    
-  for (byte x = 0; x < MAXTAGLEN; x++) RightCards[2][x] = read_rfid2[x];
-  
-  for (byte x = 0; x < 2; x++)
+  bool card1Read = false;
+  bool card2Read = false; 
+  for(int i = 0; i < EEPROM.length(); i++)
   {
-    for (byte pos = 0; pos < MAXTAGLEN; pos++)  //loop through each position in the right card string
-    {
-      Serial.println("Updating EEPROM.");
-      
-      EEPROM.update((x * MAXTAGLEN) + pos + MEMBASE, RightCards[x][pos]);   
-    }
+    EEPROM.update(i, 0);  
   }
+  while(!card1Read || !card2Read)
+  {
+
+    if(mfrc522_1.PICC_IsNewCardPresent() && mfrc522_1.PICC_ReadCardSerial() && !card1Read)
+    {  
+      Serial.println("Read card 1. Programmed.");
+  
+      for (byte i = 0; i < mfrc522_1.uid.size; i++) 
+      {
+        EEPROM.update(i, mfrc522_1.uid.uidByte[i]);
+      }
+      card1Read = true;
+    }
+  
+    if(mfrc522_2.PICC_IsNewCardPresent() && mfrc522_2.PICC_ReadCardSerial() && !card2Read)
+    {     
+      Serial.println("Read card 2. Programmed.");
+        
+      for (byte i = MAXTAGLEN; i < mfrc522_2.uid.size + MAXTAGLEN; i++) 
+      {
+        EEPROM.update(i, mfrc522_2.uid.uidByte[i - MAXTAGLEN]);
+      }
+      
+      card2Read = true;
+    }
+    
+    if(card1Read && card2Read)
+    {
+      setCorrectCards();
+      Serial.println("Both cards programmed");
+
+      for(int i = 0; i < 4; i++)
+      {
+        digitalWrite(switch1LED, HIGH);
+        digitalWrite(switch2LED, HIGH);
+        delay(200);
+        digitalWrite(switch1LED, LOW);
+        digitalWrite(switch2LED, LOW);
+        delay(200);
+      }
+  
+    }
+    
+  }
+
+
 }
 
 void setCorrectCards()
 {
-  byte NewChar;
-  
-  for(byte reader; reader < 2; reader++)
+  String UIDString = "";
+  for(byte reader = 0; reader < 2; reader++)
   {
     for (byte x = reader * MAXTAGLEN; x < (reader * MAXTAGLEN) + MAXTAGLEN; x++)
     {
-      NewChar = EEPROM.read(x + MEMBASE);   //read one byte from EEPROM
-      Serial.print(NewChar, HEX);
-      Serial.print(" ");
-    
-      RightCards[reader][x - (reader * MAXTAGLEN)] = NewChar;
+      UIDString.concat(String(EEPROM.read(x) < 0x10 ? " 0" : " "));
+      UIDString.concat(String(EEPROM.read(x), HEX)); 
     }
-  } 
+    
+    UIDString.toUpperCase();
+    keys[reader] = UIDString.substring(1);
+    
+    Serial.println("Card " + String(reader + 1) + " UID: " + UIDString);
+    UIDString = "";
+  }
 }
 
 /********************************************************************************/
@@ -326,7 +347,7 @@ void setColorOnLED2(int red, int green, int blue)
 
 /********************************************************************************/
 /*Function: Get the UID of an RFID chip                                         */
-String UID(MFRC522 mfrc522)
+String getUID(MFRC522 mfrc522)
 {
   String UIDString = "";
   for (byte i = 0; i < mfrc522.uid.size; i++) 
