@@ -32,7 +32,9 @@ String keys[NUMBER_OF_CARDS];
 bool puzzleFinished = false;
 
 bool reader1Complete = false;
+bool reader1Won = false;
 bool reader2Complete = false;
+bool reader2Won = false;
 
 static int8_t Send_buf[8] = {0}; // Buffer for Send commands.  // BETTER LOCALLY
 static uint8_t ansbuf[10] = {0}; // Buffer for the answers.    // BETTER LOCALLY
@@ -130,106 +132,77 @@ void setup() {
 
 void loop() {
 
-  if(digitalRead(programModePin) == LOW)
-  {
-     programCards();
-  }
-
-  while(mfrc522_1.PICC_IsNewCardPresent() && mfrc522_1.PICC_ReadCardSerial() || reader1Complete)
-  { 
-      Serial.println("While loop 1");
-      Serial.println(getUID(mfrc522_1));
-      Serial.println(keys[READER_ONE]);
-      // If it wasn't the correct RFID, break
-      if(!(getUID(mfrc522_1) == keys[READER_ONE]))
-          break;
-
-      Serial.println("Reader 1 correct");
-      // If the switch is clicked, turn on the light and make a 'click' noise (reader 1 is complete)
-      if(!digitalRead(switch1Pin) && !reader1Complete)
-      {
-        digitalWrite(switch1LED, HIGH); 
-        Serial.println("switch 1 clicked");
-        
-        sendCommand(CMD_PLAY_FOLDER_FILE, 02, 02); // Play a 'click' sound here
-        reader1Complete = true;
-      }
-
-      // Try to read reader 2
-      if(mfrc522_2.PICC_IsNewCardPresent() && mfrc522_2.PICC_ReadCardSerial() || reader2Complete)
-      {
-            // If it wasn't the correct RFID, break
-            Serial.println(getUID(mfrc522_2));
-            Serial.println(keys[READER_TWO]);
-            if(!(getUID(mfrc522_2) == keys[READER_TWO]))
-                break;
-
-            Serial.println("Reader 2 correct");
-            // If switch is clicked, turn on the light and make a 'click' noise (reader 2 is complete)
-            if(!digitalRead(switch2Pin) && !reader2Complete)
-            {
-              digitalWrite(switch2LED, HIGH);  
-              sendCommand(CMD_PLAY_FOLDER_FILE, 02, 02); // Play a 'click' sound here
-              reader2Complete = true;
-              Serial.println("switch 2 clicked");
-            }
-        }
-
-        // If both readers are complete, the puzzle is finished
-        if (reader1Complete && reader2Complete)
-        {
-          puzzleFinished = winningSequence();
-        }
-        while(puzzleFinished);
-  }
+    /*
+     * Insert code here.  If the manual overrides are clicked, set 'reader1Won' or 'reader2Won' to true.
+     */
+     
+    if(digitalRead(programModePin) == LOW)
+    {
+       programCards();
+    }
   
-  while(mfrc522_2.PICC_IsNewCardPresent() && mfrc522_2.PICC_ReadCardSerial() || reader2Complete)
-  { 
-      Serial.println("While loop 2");
-      Serial.println(getUID(mfrc522_2));
-      Serial.println(keys[READER_TWO]);
-      // If it wasn't the correct RFID, break
-      if(!(getUID(mfrc522_2) == keys[READER_TWO]))
-          break;
-
-      Serial.println("Reader 2 correct");
-      // If the switch is clicked, turn on the light and make a 'click' noise (reader 2 is complete)
-      if(!digitalRead(switch2Pin) && !reader2Complete)
-      {
-        digitalWrite(switch2LED, HIGH); 
-        Serial.println("switch 1 clicked");
-        sendCommand(CMD_PLAY_FOLDER_FILE, 02, 02); // Play a 'click' sound here
-        reader2Complete = true;
-      }
-
-      // Try to read reader 1
-      if(mfrc522_1.PICC_IsNewCardPresent() && mfrc522_1.PICC_ReadCardSerial() || reader1Complete)
-      {
-            Serial.println(getUID(mfrc522_1));
-            Serial.println(keys[READER_ONE]);
-            // If it wasn't the correct RFID, break
-            if(!(getUID(mfrc522_1) == keys[READER_ONE]))
-                break;
-            Serial.println("Reader 1 correct");
-            // If switch is clicked, turn on the light and make a 'click' noise (reader 1 is complete)
-            if(!digitalRead(switch1Pin) && !reader1Complete)
+    if(!reader1Complete && mfrc522_1.PICC_IsNewCardPresent() && mfrc522_1.PICC_ReadCardSerial())
+    { 
+        Serial.println("Reading card 1");
+        Serial.println(getUID(mfrc522_1));
+        Serial.println(keys[READER_ONE]);
+  
+        if((getUID(mfrc522_1) == keys[READER_ONE]))
+        {
+            Serial.println("Reader 1 reading correct card");
+            
+            if(!digitalRead(switch1Pin))
             {
-              digitalWrite(switch1LED, HIGH);
-              Serial.println("switch 1 clicked");  
-              sendCommand(CMD_PLAY_FOLDER_FILE, 02, 02); // Play a 'click' sound here
+              Serial.println("Reader 1 reading and switch 1 on. Card 1 is complete.");
               reader1Complete = true;
             }
         }
-
-        // If both readers are complete, the puzzle is finished
-        if (reader1Complete && reader2Complete)
-        {
-          puzzleFinished = winningSequence();
-        }
-        while(puzzleFinished);
     }
-    if(digitalRead(switch1Pin) == LOW)
-      Serial.println("not working");
+  
+    if(!reader2Complete && mfrc522_2.PICC_IsNewCardPresent() && mfrc522_2.PICC_ReadCardSerial())
+    { 
+        Serial.println("Reading card 2");
+        Serial.println(getUID(mfrc522_2));
+        Serial.println(keys[READER_TWO]);
+  
+        if((getUID(mfrc522_2) == keys[READER_TWO]))
+        {
+            Serial.println("Reader 2 reading correct card");
+            
+            if(!digitalRead(switch2Pin))
+            {
+              Serial.println("Reader 2 reading and switch 2 on. Card 2 is complete.");
+              reader2Complete = true;
+            }
+        }
+    }
+  
+    if(reader1Correct && !reader1Won)
+    {
+        Serial.println("Turning on light and sound for card 1. Reader 1 won = true.");
+      
+        digitalWrite(switch1LED, HIGH); 
+        sendCommand(CMD_PLAY_FOLDER_FILE, 02, 02); // Play a 'click' sound here
+        reader1Won = true;
+    }
+  
+    if(reader2Correct && !reader2Won)
+    {
+        Serial.println("Turning on light and sound for card 2. Reader 2 won = true.");
+      
+        digitalWrite(switch2LED, HIGH); 
+        sendCommand(CMD_PLAY_FOLDER_FILE, 02, 02); // Play a 'click' sound here
+        reader2Won = true;
+    }
+    
+    // If both readers are complete, the puzzle is finished
+    if (reader1Won && reader2Won)
+    {
+        Serial.println("Entering winning sequence");
+        puzzleFinished = winningSequence();
+    }
+    
+    while(puzzleFinished);
 }
 
 /********************************************************************************/
